@@ -415,9 +415,17 @@
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
                 const wrist = landmarks[0]; // Wrist position
-                const indexFinger = landmarks[8]; // Index finger tip
-                const indexBase = landmarks[5]; // Index finger base
-                const indexMiddle = landmarks[6]; // Index finger middle joint
+                
+                // Finger landmarks
+                const indexTip = landmarks[8];    // Index finger tip
+                const middleTip = landmarks[12];  // Middle finger tip
+                const ringTip = landmarks[16];    // Ring finger tip
+                const pinkyTip = landmarks[20];   // Pinky tip
+                
+                const indexBase = landmarks[5];   // Index finger base
+                const middleBase = landmarks[9];  // Middle finger base
+                const ringBase = landmarks[13];   // Ring finger base
+                const pinkyBase = landmarks[17];  // Pinky base
 
                 // Convert wrist coordinates to screen coordinates and flip X coordinate
                 const x = (1 - wrist.x) * window.innerWidth;
@@ -428,32 +436,27 @@
                 scope.style.top = y + 'px';
                 scope.classList.add('visible');
 
-                // Calculate index finger bending
-                // Check if index finger tip is close to its base (bent position)
-                const fingerBendDistance = Math.hypot(
-                    indexFinger.x - indexBase.x,
-                    indexFinger.y - indexBase.y
-                );
+                // Calculate distances from each finger tip to its base
+                const fingerDistances = [
+                    Math.hypot(indexTip.x - indexBase.x, indexTip.y - indexBase.y),  // Index
+                    Math.hypot(middleTip.x - middleBase.x, middleTip.y - middleBase.y), // Middle
+                    Math.hypot(ringTip.x - ringBase.x, ringTip.y - ringBase.y),      // Ring
+                    Math.hypot(pinkyTip.x - pinkyBase.x, pinkyTip.y - pinkyBase.y)   // Pinky
+                ];
 
-                // Calculate index finger extension (distance from base to tip)
-                const fingerExtension = Math.hypot(
-                    indexFinger.x - indexMiddle.x,
-                    indexFinger.y - indexMiddle.y
-                );
-
-                // Normalize the distances based on hand size
+                // Normalize distances based on hand size
                 const handSize = Math.hypot(
                     landmarks[0].x - landmarks[9].x, // Wrist to middle finger base
                     landmarks[0].y - landmarks[9].y
                 );
-                const normalizedBendDistance = fingerBendDistance / handSize;
-                const normalizedExtension = fingerExtension / handSize;
+                
+                const normalizedDistances = fingerDistances.map(dist => dist / handSize);
 
-                // Click when index finger is bent (close to base) and not fully extended
-                const isFingerBent = normalizedBendDistance < 0.25 && normalizedExtension < 0.3;
+                // Check if all fingers are curled (close to their bases)
+                const isGrabbing = normalizedDistances.every(dist => dist < 0.4);
 
                 const now = Date.now();
-                if (isFingerBent && now - lastClickTime > clickCooldown) {
+                if (isGrabbing && now - lastClickTime > clickCooldown) {
                     lastClickTime = now;
                     simulateClick(x, y);
                 }
