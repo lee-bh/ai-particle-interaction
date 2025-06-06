@@ -11,6 +11,7 @@
             background-color: #000;
             color: #fff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: none; /* Hide default cursor */
         }
 
         #particleCanvas {
@@ -31,6 +32,48 @@
             z-index: 2;
             border: 1px solid #333;
             max-width: 300px;
+            transition: transform 0.3s ease-in-out;
+            transform: translateX(-100%);
+        }
+
+        #controls.visible {
+            transform: translateX(0);
+        }
+
+        #close-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+        }
+
+        #open-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            border: 1px solid #333;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+
+        #open-controls:hover {
+            background-color: rgba(0, 0, 0, 0.9);
         }
 
         h2 {
@@ -124,13 +167,160 @@
             flex-grow: 1;
         }
 
+        #scope {
+            position: fixed;
+            pointer-events: none;
+            z-index: 3;
+            width: 100px;
+            height: 100px;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        #scope.visible {
+            display: block;
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 140px;
+            height: 140px;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        .crosshair::before {
+            width: 1px;
+            height: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .crosshair::after {
+            width: 140px;
+            height: 1px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .scope-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border: none;
+            border-radius: 50%;
+        }
+
+        .scope-circle::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+        }
+
+        .scope-circle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        #webcam-container {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 160px;
+            height: 120px;
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 2;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            display: none;
+            transform: scaleX(-1); /* Flip horizontally */
+            opacity: 0; /* Hide the video */
+            pointer-events: none; /* Prevent interaction with hidden video */
+        }
+
+        #webcam-container.visible {
+            display: block;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Flip the video element itself */
+        }
+
+        #webcam-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 190px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            border: 1px solid #333;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+
+        #webcam-toggle:hover {
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+
+        #webcam-toggle.active {
+            background-color: #00bcd4;
+            border-color: #00bcd4;
+        }
+
     </style>
 </head>
 <body>
 
     <canvas id="particleCanvas"></canvas>
 
+    <button id="open-controls" title="Open Controls">⚙️</button>
+    <button id="webcam-toggle" title="Toggle Webcam Control">📷</button>
+
+    <div id="webcam-container">
+        <video id="webcam" playsinline></video>
+    </div>
+
+    <div id="scope">
+        <div class="scope-circle"></div>
+        <div class="crosshair"></div>
+    </div>
+
     <div id="controls">
+        <button id="close-controls" title="Close Controls">×</button>
         <h2>Particle Controls</h2>
 
         <div class="control-group shape-buttons">
@@ -153,13 +343,8 @@
         </div>
 
         <div class="control-group">
-            <label for="particle-color">Particle Color</label>
-            <input type="color" id="particle-color" value="#00bcd4">
-        </div>
-
-        <div class="control-group">
-            <label for="particle-size">Particle Size: <span id="size-label">1.5</span></label>
-            <input type="range" id="particle-size" min="0.5" max="5" step="0.1" value="1.5">
+            <label for="particle-size">Particle Size: <span id="size-label">2</span></label>
+            <input type="range" id="particle-size" min="0.5" max="5" step="0.1" value="2">
         </div>
 
         <div class="control-group">
@@ -171,36 +356,250 @@
             <label for="repel-force">Mouse Repel Force: <span id="repel-label">50</span></label>
             <input type="range" id="repel-force" min="0" max="200" step="1" value="50">
         </div>
+
+        <div class="control-group">
+            <label for="rotation-speed">Rotation Speed: <span id="rotation-label">0.04</span></label>
+            <input type="range" id="rotation-speed" min="0.02" max="0.08" step="0.001" value="0.04">
+        </div>
+
+        <div class="control-group">
+            <label for="explosion-force">Explosion Force: <span id="explosion-label">200</span></label>
+            <input type="range" id="explosion-force" min="50" max="500" step="10" value="200">
+        </div>
+
+        <div class="control-group">
+            <label for="reload-time">Reload Time: <span id="reload-label">1.5</span>s</label>
+            <input type="range" id="reload-time" min="0.2" max="2" step="0.1" value="1.5">
+            <div id="reload-bar" style="width: 100%; height: 5px; background: #333; margin-top: 5px; border-radius: 2px;">
+                <div id="reload-progress" style="width: 0%; height: 100%; background: #00bcd4; border-radius: 2px; transition: width 0.1s linear;"></div>
+            </div>
+        </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const canvas = document.getElementById('particleCanvas');
         const ctx = canvas.getContext('2d');
+        const controls = document.getElementById('controls');
+        const openControls = document.getElementById('open-controls');
+        const closeControls = document.getElementById('close-controls');
+        const scope = document.getElementById('scope');
+        const webcamToggle = document.getElementById('webcam-toggle');
+        const webcamContainer = document.getElementById('webcam-container');
+        const webcam = document.getElementById('webcam');
+
+        let isWebcamActive = false;
+        let lastClickTime = 0;
+        const clickCooldown = 500; // Minimum time between clicks in ms
+
+        // Webcam setup
+        const hands = new Hands({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
+            }
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults((results) => {
+            if (!isWebcamActive) return;
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const wrist = landmarks[0]; // Wrist position
+                const indexFinger = landmarks[8]; // Index finger tip
+                const indexBase = landmarks[5]; // Index finger base
+                const indexMiddle = landmarks[6]; // Index finger middle joint
+
+                // Convert wrist coordinates to screen coordinates and flip X coordinate
+                const x = (1 - wrist.x) * window.innerWidth;
+                const y = wrist.y * window.innerHeight;
+
+                // Update scope position
+                scope.style.left = x + 'px';
+                scope.style.top = y + 'px';
+                scope.classList.add('visible');
+
+                // Calculate index finger bending
+                // Check if index finger tip is close to its base (bent position)
+                const fingerBendDistance = Math.hypot(
+                    indexFinger.x - indexBase.x,
+                    indexFinger.y - indexBase.y
+                );
+
+                // Calculate index finger extension (distance from base to tip)
+                const fingerExtension = Math.hypot(
+                    indexFinger.x - indexMiddle.x,
+                    indexFinger.y - indexMiddle.y
+                );
+
+                // Normalize the distances based on hand size
+                const handSize = Math.hypot(
+                    landmarks[0].x - landmarks[9].x, // Wrist to middle finger base
+                    landmarks[0].y - landmarks[9].y
+                );
+                const normalizedBendDistance = fingerBendDistance / handSize;
+                const normalizedExtension = fingerExtension / handSize;
+
+                // Click when index finger is bent (close to base) and not fully extended
+                const isFingerBent = normalizedBendDistance < 0.25 && normalizedExtension < 0.3;
+
+                const now = Date.now();
+                if (isFingerBent && now - lastClickTime > clickCooldown) {
+                    lastClickTime = now;
+                    simulateClick(x, y);
+                }
+            } else {
+                scope.classList.remove('visible');
+            }
+        });
+
+        const camera = new Camera(webcam, {
+            onFrame: async () => {
+                if (isWebcamActive) {
+                    await hands.send({image: webcam});
+                }
+            },
+            width: 640,
+            height: 480
+        });
+
+        // Toggle webcam control
+        webcamToggle.addEventListener('click', async () => {
+            isWebcamActive = !isWebcamActive;
+            webcamToggle.classList.toggle('active');
+            webcamContainer.classList.toggle('visible');
+
+            if (isWebcamActive) {
+                try {
+                    await camera.start();
+                    document.body.style.cursor = 'none';
+                } catch (e) {
+                    console.error('Failed to start webcam:', e);
+                    isWebcamActive = false;
+                    webcamToggle.classList.remove('active');
+                    webcamContainer.classList.remove('visible');
+                }
+            } else {
+                camera.stop();
+                document.body.style.cursor = 'auto';
+            }
+        });
+
+        // Simulate click at coordinates
+        function simulateClick(x, y) {
+            if (!settings.canShoot) return;
+
+            // Play gun sound
+            gunSound.currentTime = 0;
+            gunSound.play().catch(err => console.log('Audio play failed:', err));
+
+            // Apply explosion effect to all particles
+            for (const particle of particles) {
+                particle.explode(x, y);
+            }
+
+            // Check if target was hit
+            if (checkTargetHit(x, y)) {
+                placeTarget();
+            }
+
+            // Start reload
+            startReload();
+        }
+
+        // Update mouse event listeners to only work when webcam is inactive
+        window.addEventListener('mousemove', (e) => {
+            if (!isWebcamActive) {
+                scope.style.left = e.clientX + 'px';
+                scope.style.top = e.clientY + 'px';
+                scope.classList.add('visible');
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            if (!isWebcamActive) {
+                simulateClick(e.clientX, e.clientY);
+            }
+        });
+
+        // Control panel visibility
+        openControls.addEventListener('click', () => {
+            controls.classList.add('visible');
+        });
+
+        closeControls.addEventListener('click', () => {
+            controls.classList.remove('visible');
+        });
+
+        // Hide scope when mouse leaves window (only for mouse control)
+        window.addEventListener('mouseout', () => {
+            if (!isWebcamActive) {
+                scope.classList.remove('visible');
+            }
+        });
 
         let width, height, centerX, centerY;
         let particles = [];
-        let mouse = { x: null, y: null, radius: 150 };
+        let mouse = { x: null, y: null, radius: 30 };
 
         const settings = {
             particleCount: 3000,
-            particleColor: '#00bcd4',
-            particleSize: 1.5,
+            particleColor: '#FF00FF',
+            particleSize: 2,
             speed: 0.05,
             repelForce: 50,
-            fov: 300 // Field of view for 3D projection
+            fov: 300, // Field of view for 3D projection
+            rotationSpeed: 0.04, // Rotation speed in degrees per frame
+            currentAngle: 0, // Track current rotation angle
+            explosionForce: 200, // Force of explosion on click
+            explosionRadius: 150, // Radius of explosion effect
+            reloadTime: 1500, // Reload time in milliseconds
+            canShoot: true, // Whether shooting is allowed
+            targetRadius: 10, // Radius of the target circle
+            currentShape: 'sphere', // Track current shape for target positioning
+            mouseRadius: 30 // Fixed mouse radius
         };
+
+        // Target system
+        let target = {
+            x: 0,
+            y: 0,
+            z: 0,
+            projX: 0,
+            projY: 0,
+            projScale: 1
+        };
+
+        // Audio setup
+        const gunSound = new Audio('gun.wav');
+        let reloadTimer = null;
+        let reloadProgress = 0;
 
         // --- UI Controls ---
         const countSlider = document.getElementById('particle-count');
-        const colorPicker = document.getElementById('particle-color');
         const sizeSlider = document.getElementById('particle-size');
         const speedSlider = document.getElementById('speed');
         const repelSlider = document.getElementById('repel-force');
+        const rotationSlider = document.getElementById('rotation-speed');
+        const explosionSlider = document.getElementById('explosion-force');
+        const reloadSlider = document.getElementById('reload-time');
+        const reloadProgressBar = document.getElementById('reload-progress');
         const countLabel = document.getElementById('count-label');
         const sizeLabel = document.getElementById('size-label');
         const speedLabel = document.getElementById('speed-label');
         const repelLabel = document.getElementById('repel-label');
+        const rotationLabel = document.getElementById('rotation-label');
+        const explosionLabel = document.getElementById('explosion-label');
+        const reloadLabel = document.getElementById('reload-label');
         
         const shapeButtons = document.querySelectorAll('.shape-buttons button');
         const textInput = document.getElementById('text-input');
@@ -213,7 +612,6 @@
             init();
         });
 
-        colorPicker.addEventListener('input', () => settings.particleColor = colorPicker.value);
         sizeSlider.addEventListener('input', () => {
             settings.particleSize = parseFloat(sizeSlider.value);
             sizeLabel.textContent = settings.particleSize.toFixed(1);
@@ -225,6 +623,21 @@
         repelSlider.addEventListener('input', () => {
             settings.repelForce = parseFloat(repelSlider.value);
             repelLabel.textContent = settings.repelForce.toFixed(0);
+        });
+
+        rotationSlider.addEventListener('input', () => {
+            settings.rotationSpeed = parseFloat(rotationSlider.value);
+            rotationLabel.textContent = settings.rotationSpeed.toFixed(3);
+        });
+
+        explosionSlider.addEventListener('input', () => {
+            settings.explosionForce = parseFloat(explosionSlider.value);
+            explosionLabel.textContent = settings.explosionForce.toFixed(0);
+        });
+
+        reloadSlider.addEventListener('input', () => {
+            settings.reloadTime = parseFloat(reloadSlider.value) * 1000; // Convert to milliseconds
+            reloadLabel.textContent = reloadSlider.value;
         });
 
         shapeButtons.forEach(button => {
@@ -251,6 +664,25 @@
             }
         });
 
+        // Function to check if particles have reached their targets
+        function checkTransitionComplete() {
+            const threshold = 0.5; // Increased threshold for "close enough"
+            const requiredPercentage = 0.2; // Start rotation when 20% of particles are close enough
+            let closeParticles = 0;
+            
+            for (const particle of particles) {
+                const dx = particle.tx - particle.x;
+                const dy = particle.ty - particle.y;
+                const dz = particle.tz - particle.z;
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if (distance <= threshold) {
+                    closeParticles++;
+                }
+            }
+            
+            // Return true if the required percentage of particles are close enough
+            return (closeParticles / particles.length) >= requiredPercentage;
+        }
 
         // --- Particle Class ---
         class Particle {
@@ -265,10 +697,19 @@
                 this.ty = this.y;
                 this.tz = this.z;
                 
+                // Original target position (for rotation)
+                this.originalTx = this.tx;
+                this.originalTy = this.ty;
+                this.originalTz = this.tz;
+                
                 // Projected 2D position
                 this.projX = 0;
                 this.projY = 0;
                 this.projScale = 1;
+
+                // Explosion effect
+                this.explosionVelocity = { x: 0, y: 0, z: 0 };
+                this.isExploding = false;
             }
 
             // Project 3D coordinates to 2D
@@ -280,10 +721,34 @@
 
             // Update position (move towards target)
             update() {
-                // Easing towards target
-                this.x += (this.tx - this.x) * settings.speed;
-                this.y += (this.ty - this.y) * settings.speed;
-                this.z += (this.tz - this.z) * settings.speed;
+                // Handle explosion effect
+                if (this.isExploding) {
+                    // Apply explosion velocity
+                    this.x += this.explosionVelocity.x;
+                    this.y += this.explosionVelocity.y;
+                    this.z += this.explosionVelocity.z;
+                    
+                    // Gradually reduce explosion velocity
+                    this.explosionVelocity.x *= 0.95;
+                    this.explosionVelocity.y *= 0.95;
+                    this.explosionVelocity.z *= 0.95;
+                    
+                    // Stop explosion when velocity is very small
+                    if (Math.abs(this.explosionVelocity.x) < 0.1 && 
+                        Math.abs(this.explosionVelocity.y) < 0.1 && 
+                        Math.abs(this.explosionVelocity.z) < 0.1) {
+                        this.isExploding = false;
+                        // Reset to original target position
+                        this.tx = this.originalTx;
+                        this.ty = this.originalTy;
+                        this.tz = this.originalTz;
+                    }
+                } else {
+                    // Normal movement towards target
+                    this.x += (this.tx - this.x) * settings.speed;
+                    this.y += (this.ty - this.y) * settings.speed;
+                    this.z += (this.tz - this.z) * settings.speed;
+                }
 
                 // Mouse repulsion
                 if (mouse.x !== null && settings.repelForce > 0) {
@@ -291,8 +756,8 @@
                     const dy = this.projY - mouse.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (dist < mouse.radius) {
-                        const force = (mouse.radius - dist) / mouse.radius;
+                    if (dist < settings.mouseRadius) {
+                        const force = (settings.mouseRadius - dist) / settings.mouseRadius;
                         const angle = Math.atan2(dy, dx);
                         const repelX = Math.cos(angle) * force * settings.repelForce;
                         const repelY = Math.sin(angle) * force * settings.repelForce;
@@ -302,6 +767,18 @@
                         this.y += repelY;
                     }
                 }
+
+                // Always apply rotation
+                const angleRad = settings.currentAngle * (Math.PI / 180);
+                const cos = Math.cos(angleRad);
+                const sin = Math.sin(angleRad);
+                
+                // Rotate around Y axis using original positions
+                const newX = this.originalTx * cos - this.originalTz * sin;
+                const newZ = this.originalTx * sin + this.originalTz * cos;
+                
+                this.tx = newX;
+                this.tz = newZ;
             }
 
             draw() {
@@ -317,10 +794,31 @@
                     ctx.fill();
                 }
             }
+
+            // Apply explosion effect
+            explode(clickX, clickY) {
+                const dx = this.projX - clickX;
+                const dy = this.projY - clickY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < settings.explosionRadius) {
+                    const force = (settings.explosionRadius - dist) / settings.explosionRadius;
+                    const angle = Math.atan2(dy, dx);
+                    
+                    // Calculate explosion velocity
+                    this.explosionVelocity.x = Math.cos(angle) * force * settings.explosionForce;
+                    this.explosionVelocity.y = Math.sin(angle) * force * settings.explosionForce;
+                    this.explosionVelocity.z = (Math.random() - 0.5) * force * settings.explosionForce;
+                    
+                    this.isExploding = true;
+                }
+            }
         }
         
         // --- Shape Generators ---
         function setShape(shape, text = '') {
+            settings.currentShape = shape; // Update current shape
+            settings.currentAngle = 0; // Reset rotation angle
             let points = [];
             const radius = Math.min(width, height) * 0.3;
 
@@ -404,10 +902,17 @@
                         particles[i].tx = target.x;
                         particles[i].ty = target.y;
                         particles[i].tz = target.z;
+                        // Store original positions for rotation
+                        particles[i].originalTx = target.x;
+                        particles[i].originalTy = target.y;
+                        particles[i].originalTz = target.z;
                     } else { // Hide extra particles if shape has fewer points
                         particles[i].tx = particles[i].x;
                         particles[i].ty = particles[i].y;
                         particles[i].tz = 10000; // Move it far away
+                        particles[i].originalTx = particles[i].tx;
+                        particles[i].originalTy = particles[i].ty;
+                        particles[i].originalTz = particles[i].tz;
                     }
                 }
             }
@@ -429,10 +934,23 @@
             ctx.clearRect(0, 0, width, height);
             ctx.fillStyle = settings.particleColor;
             
+            // Update rotation angle
+            settings.currentAngle += settings.rotationSpeed;
+            if (settings.currentAngle >= 360) {
+                settings.currentAngle -= 360;
+            }
+            
             for (const particle of particles) {
                 particle.update();
                 particle.draw();
             }
+
+            // Draw target
+            projectTarget();
+            ctx.beginPath();
+            ctx.fillStyle = '#FFD700'; // Yellow color
+            ctx.arc(target.projX, target.projY, settings.targetRadius * target.projScale, 0, Math.PI * 2);
+            ctx.fill();
 
             requestAnimationFrame(animate);
         }
@@ -463,9 +981,104 @@
             mouse.x = null;
             mouse.y = null;
         });
-        
+
+        // Function to handle reload
+        function startReload() {
+            settings.canShoot = false;
+            reloadProgress = 0;
+            reloadProgressBar.style.width = '0%';
+            
+            if (reloadTimer) {
+                clearInterval(reloadTimer);
+            }
+            
+            const startTime = Date.now();
+            const endTime = startTime + settings.reloadTime;
+            
+            reloadTimer = setInterval(() => {
+                const currentTime = Date.now();
+                reloadProgress = (currentTime - startTime) / settings.reloadTime;
+                
+                if (currentTime >= endTime) {
+                    reloadProgress = 1;
+                    settings.canShoot = true;
+                    clearInterval(reloadTimer);
+                }
+                
+                reloadProgressBar.style.width = `${reloadProgress * 100}%`;
+            }, 10);
+        }
+
+        // Function to get random position within current shape
+        function getRandomPositionInShape() {
+            const radius = Math.min(width, height) * 0.3;
+            let x, y, z;
+
+            switch (settings.currentShape) {
+                case 'sphere':
+                    // Random point on sphere surface
+                    const phi = Math.random() * Math.PI * 2;
+                    const theta = Math.acos(2 * Math.random() - 1);
+                    x = radius * Math.sin(theta) * Math.cos(phi);
+                    y = radius * Math.sin(theta) * Math.sin(phi);
+                    z = radius * Math.cos(theta);
+                    break;
+
+                case 'torus':
+                    // Random point on torus surface
+                    const R = radius; // Major radius
+                    const r = radius * 0.4; // Minor radius
+                    const u = Math.random() * Math.PI * 2;
+                    const v = Math.random() * Math.PI * 2;
+                    x = (R + r * Math.cos(v)) * Math.cos(u);
+                    y = (R + r * Math.cos(v)) * Math.sin(u);
+                    z = r * Math.sin(v);
+                    break;
+
+                case 'cube':
+                    // Random point on cube surface
+                    const side = radius * 1.5;
+                    const face = Math.floor(Math.random() * 6);
+                    switch(face) {
+                        case 0: x = -side/2; y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // left
+                        case 1: x = side/2;  y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // right
+                        case 2: y = -side/2; x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // top
+                        case 3: y = side/2;  x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // bottom
+                        case 4: z = -side/2; x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // back
+                        case 5: z = side/2;  x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // front
+                    }
+                    break;
+            }
+
+            return { x, y, z };
+        }
+
+        // Function to place target in new random position
+        function placeTarget() {
+            const pos = getRandomPositionInShape();
+            target.x = pos.x;
+            target.y = pos.y;
+            target.z = pos.z;
+        }
+
+        // Function to project target to 2D
+        function projectTarget() {
+            target.projScale = settings.fov / (settings.fov + target.z);
+            target.projX = target.x * target.projScale + centerX;
+            target.projY = target.y * target.projScale + centerY;
+        }
+
+        // Function to check if click hit target
+        function checkTargetHit(clickX, clickY) {
+            const dx = target.projX - clickX;
+            const dy = target.projY - clickY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            return dist <= settings.targetRadius;
+        }
+
         // --- Start ---
         init();
+        placeTarget(); // Place initial target
         animate();
     });
     </script>
