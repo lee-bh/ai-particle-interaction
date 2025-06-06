@@ -544,12 +544,7 @@
             controls.classList.remove('visible');
         });
 
-        // Hide scope when mouse leaves window (only for mouse control)
-        window.addEventListener('mouseout', () => {
-            mouse.x = null;
-            mouse.y = null;
-            document.getElementById('open-controls').classList.remove('visible');
-        });
+     
 
         let width, height, centerX, centerY;
         let particles = [];
