@@ -66,14 +66,10 @@
             font-size: 20px;
             cursor: pointer;
             z-index: 2;
-            display: none; /* Hide by default */
+            display: none;
             align-items: center;
             justify-content: center;
             transition: background-color 0.2s;
-        }
-
-        #open-controls.visible {
-            display: flex; /* Show when visible class is added */
         }
 
         #open-controls:hover {
@@ -294,6 +290,12 @@
             align-items: center;
             justify-content: center;
             transition: background-color 0.2s;
+        }
+
+        @media (max-width: 768px) {
+            #webcam-toggle {
+                display: none !important; /* Hide on mobile devices */
+            }
         }
 
         #webcam-toggle:hover {
@@ -518,14 +520,10 @@
 
         // Update mouse event listeners to only work when webcam is inactive
         window.addEventListener('mousemove', (e) => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
-            
-            // Show open-controls button when mouse is near right edge
-            if (e.clientX > window.innerWidth - 100) { // Show when within 100px of right edge
-                openControls.classList.add('visible');
-            } else {
-                openControls.classList.remove('visible');
+            if (!isWebcamActive) {
+                scope.style.left = e.clientX + 'px';
+                scope.style.top = e.clientY + 'px';
+                scope.classList.add('visible');
             }
         });
 
@@ -544,7 +542,12 @@
             controls.classList.remove('visible');
         });
 
-     
+        // Hide scope when mouse leaves window (only for mouse control)
+        window.addEventListener('mouseout', () => {
+            if (!isWebcamActive) {
+                scope.classList.remove('visible');
+            }
+        });
 
         let width, height, centerX, centerY;
         let particles = [];
@@ -553,15 +556,15 @@
         const settings = {
             particleCount: 6000,
             particleColors: ['#0000FF', '#00FF00', '#FF0000', '#FF00FF'], // Available colors
-            particleSize: 12,
+            particleSize: window.innerWidth <= 768 ? 12 : 16, // Dynamic particle size based on device
             speed: 0.05,
             repelForce: 50,
-            fov: 500, // Field of view for 3D projection
+            fov: window.innerWidth <= 768 ? 150 : 500, // Dynamic FOV based on screen width
             explosionForce: 100, // Force of explosion on click
             explosionRadius: 200, // Radius of explosion effect
             reloadTime: 500, // Reload time in milliseconds
             canShoot: true, // Whether shooting is allowed
-            targetRadius: 5, // Radius of the target square
+            targetRadius: window.innerWidth <= 768 ? 10 : 5, // Larger target radius on mobile
             currentShape: 'cube', // Track current shape for target positioning
             mouseRadius: 80, // Fixed mouse radius
             maxRotation: 20, // Maximum rotation in degrees
@@ -580,7 +583,7 @@
         };
 
         // Audio setup
-        const gunSound = new Audio('gun.wav');
+        const gunSound = new Audio('gun.mp3');
         let reloadTimer = null;
         let reloadProgress = 0;
 
@@ -694,7 +697,7 @@
                 this.originalX = this.x;
                 this.originalY = this.y;
                 this.originalZ = this.z;
-
+                
                 // Projected 2D position
                 this.projX = 0;
                 this.projY = 0;
@@ -704,8 +707,32 @@
                 this.explosionVelocity = { x: 0, y: 0, z: 0 };
                 this.isExploding = false;
 
-                // Assign random color from available colors
-                this.color = settings.particleColors[Math.floor(Math.random() * settings.particleColors.length)];
+                // Color properties
+                this.originalColor = settings.particleColors[Math.floor(Math.random() * settings.particleColors.length)];
+                this.color = this.originalColor;
+                this.targetColor = this.originalColor;
+                this.colorTransitionSpeed = 0.05;
+                this.isColorTransitioning = false;
+            }
+
+            // Helper function to interpolate between colors
+            interpolateColor(color1, color2, factor) {
+                const hex1 = color1.replace('#', '');
+                const hex2 = color2.replace('#', '');
+                
+                const r1 = parseInt(hex1.substr(0, 2), 16);
+                const g1 = parseInt(hex1.substr(2, 2), 16);
+                const b1 = parseInt(hex1.substr(4, 2), 16);
+                
+                const r2 = parseInt(hex2.substr(0, 2), 16);
+                const g2 = parseInt(hex2.substr(2, 2), 16);
+                const b2 = parseInt(hex2.substr(4, 2), 16);
+                
+                const r = Math.round(r1 + (r2 - r1) * factor);
+                const g = Math.round(g1 + (g2 - g1) * factor);
+                const b = Math.round(b1 + (b2 - b1) * factor);
+                
+                return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
             }
 
             // Project 3D coordinates to 2D
@@ -715,8 +742,19 @@
                 this.projY = this.y * this.projScale + centerY;
             }
 
-            // Update position (move towards target)
+            // Update position and color
             update() {
+                // Handle color transition
+                if (this.isColorTransitioning) {
+                    const currentColor = this.color;
+                    this.color = this.interpolateColor(currentColor, this.targetColor, this.colorTransitionSpeed);
+                    
+                    // Check if color transition is complete
+                    if (this.color === this.targetColor) {
+                        this.isColorTransitioning = false;
+                    }
+                }
+
                 // Handle explosion effect
                 if (this.isExploding) {
                     // Apply explosion velocity
@@ -788,7 +826,7 @@
                     ctx.globalAlpha = alpha;
                     // Draw square instead of rectangle
                     const squareSize = size; // Equal width and height for square
-                    ctx.fillStyle = this.color; // Use particle's assigned color
+                    ctx.fillStyle = this.color; // Use current color (which may be transitioning)
                     ctx.rect(
                         this.projX - squareSize/2, // Center the square
                         this.projY - squareSize/2,
@@ -816,6 +854,18 @@
                     
                     this.isExploding = true;
                 }
+            }
+
+            // Start color transition to yellow and back
+            startColorTransition() {
+                this.targetColor = '#FFFF00'; // Yellow
+                this.isColorTransitioning = true;
+                
+                // After a delay, transition back to original color
+                setTimeout(() => {
+                    this.targetColor = this.originalColor;
+                    this.isColorTransitioning = true;
+                }, 800); // Change back after 1 second
             }
         }
         
@@ -962,6 +1012,26 @@
         // --- Event Listeners ---
         window.addEventListener('resize', () => {
             resizeCanvas();
+            // Update FOV based on screen width
+            settings.fov = window.innerWidth <= 768 ? 150 : 500;
+            // Update target radius based on screen width
+            settings.targetRadius = window.innerWidth <= 768 ? 10 : 5;
+            // Update particle size based on screen width
+            settings.particleSize = window.innerWidth <= 768 ? 12 : 16;
+            // Update size label in UI
+            sizeLabel.textContent = settings.particleSize.toFixed(1);
+            // Update size slider to match
+            sizeSlider.value = settings.particleSize;
+            
+            // Disable webcam on mobile devices
+            if (window.innerWidth <= 768 && isWebcamActive) {
+                isWebcamActive = false;
+                webcamToggle.classList.remove('active');
+                webcamContainer.classList.remove('visible');
+                camera.stop();
+                document.body.style.cursor = 'auto';
+            }
+            
             // Re-calculate shape based on new dimensions
             const activeShapeButton = document.querySelector('.shape-buttons button.active');
             if (activeShapeButton) {
@@ -969,10 +1039,14 @@
             }
         });
 
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
         window.addEventListener('mouseout', () => {
             mouse.x = null;
             mouse.y = null;
-            document.getElementById('open-controls').classList.remove('visible');
         });
 
         // Function to handle reload
@@ -1044,9 +1118,24 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
             // Use half of the square's diagonal as the hit radius
             const hitRadius = settings.targetRadius * Math.sqrt(2) * target.projScale;
-            return dist <= hitRadius;
+            
+            if (dist <= hitRadius) {
+                // Change colors of nearby particles
+                const colorChangeRadius = 250; // Radius for color change effect
+                for (const particle of particles) {
+                    const particleDx = particle.projX - clickX;
+                    const particleDy = particle.projY - clickY;
+                    const particleDist = Math.sqrt(particleDx * particleDx + particleDy * particleDy);
+                    
+                    if (particleDist <= colorChangeRadius) {
+                        particle.startColorTransition();
+                    }
+                }
+                return true;
+            }
+            return false;
         }
-
+        
         // --- Start ---
         init();
         placeTarget(); // Place initial target
