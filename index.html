@@ -66,10 +66,14 @@
             font-size: 20px;
             cursor: pointer;
             z-index: 2;
-            display: flex;
+            display: none; /* Hide by default */
             align-items: center;
             justify-content: center;
             transition: background-color 0.2s;
+        }
+
+        #open-controls.visible {
+            display: flex; /* Show when visible class is added */
         }
 
         #open-controls:hover {
@@ -514,10 +518,14 @@
 
         // Update mouse event listeners to only work when webcam is inactive
         window.addEventListener('mousemove', (e) => {
-            if (!isWebcamActive) {
-                scope.style.left = e.clientX + 'px';
-                scope.style.top = e.clientY + 'px';
-                scope.classList.add('visible');
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            
+            // Show open-controls button when mouse is near right edge
+            if (e.clientX > window.innerWidth - 100) { // Show when within 100px of right edge
+                openControls.classList.add('visible');
+            } else {
+                openControls.classList.remove('visible');
             }
         });
 
@@ -538,9 +546,9 @@
 
         // Hide scope when mouse leaves window (only for mouse control)
         window.addEventListener('mouseout', () => {
-            if (!isWebcamActive) {
-                scope.classList.remove('visible');
-            }
+            mouse.x = null;
+            mouse.y = null;
+            document.getElementById('open-controls').classList.remove('visible');
         });
 
         let width, height, centerX, centerY;
@@ -966,14 +974,10 @@
             }
         });
 
-        window.addEventListener('mousemove', (e) => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
-        });
-
         window.addEventListener('mouseout', () => {
             mouse.x = null;
             mouse.y = null;
+            document.getElementById('open-controls').classList.remove('visible');
         });
 
         // Function to handle reload
