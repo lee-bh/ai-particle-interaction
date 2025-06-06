@@ -324,9 +324,7 @@
         <h2>Particle Controls</h2>
 
         <div class="control-group shape-buttons">
-            <button id="btn-sphere" class="active">Sphere</button>
-            <button id="btn-torus">Torus</button>
-            <button id="btn-cube">Cube</button>
+            <button id="btn-cube" class="active">Cube</button>
         </div>
 
         <div class="control-group">
@@ -355,11 +353,6 @@
         <div class="control-group">
             <label for="repel-force">Mouse Repel Force: <span id="repel-label">50</span></label>
             <input type="range" id="repel-force" min="0" max="200" step="1" value="50">
-        </div>
-
-        <div class="control-group">
-            <label for="rotation-speed">Rotation Speed: <span id="rotation-label">0.04</span></label>
-            <input type="range" id="rotation-speed" min="0.02" max="0.08" step="0.001" value="0.04">
         </div>
 
         <div class="control-group">
@@ -555,21 +548,22 @@
         let mouse = { x: null, y: null, radius: 30 };
 
         const settings = {
-            particleCount: 3000,
-            particleColor: '#FF00FF',
-            particleSize: 2,
+            particleCount: 6000,
+            particleColors: ['#0000FF', '#00FF00', '#FF0000', '#FF00FF'], // Available colors
+            particleSize: 12,
             speed: 0.05,
             repelForce: 50,
-            fov: 300, // Field of view for 3D projection
-            rotationSpeed: 0.04, // Rotation speed in degrees per frame
-            currentAngle: 0, // Track current rotation angle
-            explosionForce: 200, // Force of explosion on click
-            explosionRadius: 150, // Radius of explosion effect
-            reloadTime: 1500, // Reload time in milliseconds
+            fov: 500, // Field of view for 3D projection
+            explosionForce: 100, // Force of explosion on click
+            explosionRadius: 200, // Radius of explosion effect
+            reloadTime: 500, // Reload time in milliseconds
             canShoot: true, // Whether shooting is allowed
-            targetRadius: 10, // Radius of the target circle
-            currentShape: 'sphere', // Track current shape for target positioning
-            mouseRadius: 30 // Fixed mouse radius
+            targetRadius: 5, // Radius of the target square
+            currentShape: 'cube', // Track current shape for target positioning
+            mouseRadius: 80, // Fixed mouse radius
+            maxRotation: 20, // Maximum rotation in degrees
+            currentRotationX: 0, // Current X rotation
+            currentRotationY: 0  // Current Y rotation
         };
 
         // Target system
@@ -592,7 +586,6 @@
         const sizeSlider = document.getElementById('particle-size');
         const speedSlider = document.getElementById('speed');
         const repelSlider = document.getElementById('repel-force');
-        const rotationSlider = document.getElementById('rotation-speed');
         const explosionSlider = document.getElementById('explosion-force');
         const reloadSlider = document.getElementById('reload-time');
         const reloadProgressBar = document.getElementById('reload-progress');
@@ -600,7 +593,6 @@
         const sizeLabel = document.getElementById('size-label');
         const speedLabel = document.getElementById('speed-label');
         const repelLabel = document.getElementById('repel-label');
-        const rotationLabel = document.getElementById('rotation-label');
         const explosionLabel = document.getElementById('explosion-label');
         const reloadLabel = document.getElementById('reload-label');
         
@@ -626,11 +618,6 @@
         repelSlider.addEventListener('input', () => {
             settings.repelForce = parseFloat(repelSlider.value);
             repelLabel.textContent = settings.repelForce.toFixed(0);
-        });
-
-        rotationSlider.addEventListener('input', () => {
-            settings.rotationSpeed = parseFloat(rotationSlider.value);
-            rotationLabel.textContent = settings.rotationSpeed.toFixed(3);
         });
 
         explosionSlider.addEventListener('input', () => {
@@ -699,12 +686,12 @@
                 this.tx = this.x;
                 this.ty = this.y;
                 this.tz = this.z;
-                
-                // Original target position (for rotation)
-                this.originalTx = this.tx;
-                this.originalTy = this.ty;
-                this.originalTz = this.tz;
-                
+
+                // Original position (for rotation)
+                this.originalX = this.x;
+                this.originalY = this.y;
+                this.originalZ = this.z;
+
                 // Projected 2D position
                 this.projX = 0;
                 this.projY = 0;
@@ -713,6 +700,9 @@
                 // Explosion effect
                 this.explosionVelocity = { x: 0, y: 0, z: 0 };
                 this.isExploding = false;
+
+                // Assign random color from available colors
+                this.color = settings.particleColors[Math.floor(Math.random() * settings.particleColors.length)];
             }
 
             // Project 3D coordinates to 2D
@@ -741,16 +731,28 @@
                         Math.abs(this.explosionVelocity.y) < 0.1 && 
                         Math.abs(this.explosionVelocity.z) < 0.1) {
                         this.isExploding = false;
-                        // Reset to original target position
-                        this.tx = this.originalTx;
-                        this.ty = this.originalTy;
-                        this.tz = this.originalTz;
+                        // Reset to original position
+                        this.x = this.originalX;
+                        this.y = this.originalY;
+                        this.z = this.originalZ;
                     }
                 } else {
-                    // Normal movement towards target
-                    this.x += (this.tx - this.x) * settings.speed;
-                    this.y += (this.ty - this.y) * settings.speed;
-                    this.z += (this.tz - this.z) * settings.speed;
+                    // Apply rotation
+                    const radX = settings.currentRotationX * (Math.PI / 180);
+                    const radY = settings.currentRotationY * (Math.PI / 180);
+                    
+                    // Rotate around Y axis
+                    let rotatedX = this.originalX * Math.cos(radY) - this.originalZ * Math.sin(radY);
+                    let rotatedZ = this.originalX * Math.sin(radY) + this.originalZ * Math.cos(radY);
+                    
+                    // Rotate around X axis
+                    let rotatedY = this.originalY * Math.cos(radX) - rotatedZ * Math.sin(radX);
+                    rotatedZ = this.originalY * Math.sin(radX) + rotatedZ * Math.cos(radX);
+
+                    // Move towards rotated position
+                    this.x += (rotatedX - this.x) * settings.speed;
+                    this.y += (rotatedY - this.y) * settings.speed;
+                    this.z += (rotatedZ - this.z) * settings.speed;
                 }
 
                 // Mouse repulsion
@@ -770,18 +772,6 @@
                         this.y += repelY;
                     }
                 }
-
-                // Always apply rotation
-                const angleRad = settings.currentAngle * (Math.PI / 180);
-                const cos = Math.cos(angleRad);
-                const sin = Math.sin(angleRad);
-                
-                // Rotate around Y axis using original positions
-                const newX = this.originalTx * cos - this.originalTz * sin;
-                const newZ = this.originalTx * sin + this.originalTz * cos;
-                
-                this.tx = newX;
-                this.tz = newZ;
             }
 
             draw() {
@@ -793,7 +783,15 @@
                 if (size > 0 && alpha > 0) {
                     ctx.beginPath();
                     ctx.globalAlpha = alpha;
-                    ctx.arc(this.projX, this.projY, size, 0, Math.PI * 2);
+                    // Draw square instead of rectangle
+                    const squareSize = size; // Equal width and height for square
+                    ctx.fillStyle = this.color; // Use particle's assigned color
+                    ctx.rect(
+                        this.projX - squareSize/2, // Center the square
+                        this.projY - squareSize/2,
+                        squareSize,
+                        squareSize
+                    );
                     ctx.fill();
                 }
             }
@@ -821,47 +819,24 @@
         // --- Shape Generators ---
         function setShape(shape, text = '') {
             settings.currentShape = shape; // Update current shape
-            settings.currentAngle = 0; // Reset rotation angle
             let points = [];
             const radius = Math.min(width, height) * 0.3;
 
             switch (shape) {
-                case 'sphere':
-                    for (let i = 0; i < settings.particleCount; i++) {
-                        const phi = Math.acos(-1 + (2 * i) / settings.particleCount);
-                        const theta = Math.sqrt(settings.particleCount * Math.PI) * phi;
-                        const x = radius * Math.cos(theta) * Math.sin(phi);
-                        const y = radius * Math.sin(theta) * Math.sin(phi);
-                        const z = radius * Math.cos(phi);
-                        points.push({ x, y, z });
-                    }
-                    break;
-
-                case 'torus':
-                    const R = radius; // Major radius
-                    const r = radius * 0.4; // Minor radius
-                    for (let i = 0; i < settings.particleCount; i++) {
-                        const u = (i / settings.particleCount) * 2 * Math.PI;
-                        const v = Math.random() * 2 * Math.PI;
-                        const x = (R + r * Math.cos(v)) * Math.cos(u);
-                        const y = (R + r * Math.cos(v)) * Math.sin(u);
-                        const z = r * Math.sin(v);
-                        points.push({ x, y, z });
-                    }
-                    break;
-                
                 case 'cube':
-                    const side = radius * 1.5;
+                    const ratio = window.innerWidth / window.innerHeight;
+                    const side = radius * 1.8;
+                    const side2 = radius * 1.8 * ratio;
                     for (let i = 0; i < settings.particleCount; i++) {
                         let x, y, z;
                         const face = Math.floor(Math.random() * 6);
                         switch(face) {
-                            case 0: x = -side/2; y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // left
-                            case 1: x = side/2;  y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // right
-                            case 2: y = -side/2; x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // top
-                            case 3: y = side/2;  x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // bottom
-                            case 4: z = -side/2; x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // back
-                            case 5: z = side/2;  x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // front
+                            case 0: x = -side2/2; y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // left
+                            case 1: x = side2/2;  y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // right
+                            case 2: y = -side/2; x = Math.random() * side2 - side2/2; z = Math.random() * side - side/2; break; // top
+                            case 3: y = side/2;  x = Math.random() * side2 - side2/2; z = Math.random() * side - side/2; break; // bottom
+                            case 4: z = -side/2; x = Math.random() * side2 - side2/2; y = Math.random() * side2 - side2/2; break; // back
+                            case 5: z = side/2;  x = Math.random() * side2 - side2/2; y = Math.random() * side2 - side2/2; break; // front
                         }
                         points.push({ x, y, z });
                     }
@@ -906,16 +881,16 @@
                         particles[i].ty = target.y;
                         particles[i].tz = target.z;
                         // Store original positions for rotation
-                        particles[i].originalTx = target.x;
-                        particles[i].originalTy = target.y;
-                        particles[i].originalTz = target.z;
+                        particles[i].originalX = target.x;
+                        particles[i].originalY = target.y;
+                        particles[i].originalZ = target.z;
                     } else { // Hide extra particles if shape has fewer points
                         particles[i].tx = particles[i].x;
                         particles[i].ty = particles[i].y;
                         particles[i].tz = 10000; // Move it far away
-                        particles[i].originalTx = particles[i].tx;
-                        particles[i].originalTy = particles[i].ty;
-                        particles[i].originalTz = particles[i].tz;
+                        particles[i].originalX = particles[i].tx;
+                        particles[i].originalY = particles[i].ty;
+                        particles[i].originalZ = particles[i].tz;
                     }
                 }
             }
@@ -935,12 +910,22 @@
 
         function animate() {
             ctx.clearRect(0, 0, width, height);
-            ctx.fillStyle = settings.particleColor;
+            // Remove the global fillStyle setting since each particle has its own color
+            // ctx.fillStyle = settings.particleColor;
             
-            // Update rotation angle
-            settings.currentAngle += settings.rotationSpeed;
-            if (settings.currentAngle >= 360) {
-                settings.currentAngle -= 360;
+            // Update rotation based on mouse position
+            if (mouse.x !== null && mouse.y !== null) {
+                // Calculate distance from center (normalized to 0-1)
+                const dx = (mouse.x - centerX) / centerX;
+                const dy = (mouse.y - centerY) / centerY;
+                
+                // Calculate rotation angles (max 20 degrees)
+                settings.currentRotationY = dx * settings.maxRotation;
+                settings.currentRotationX = dy * settings.maxRotation; // Removed negative sign to flip direction
+            } else {
+                // Reset rotation when mouse leaves
+                settings.currentRotationX = 0;
+                settings.currentRotationY = 0;
             }
             
             for (const particle of particles) {
@@ -952,7 +937,13 @@
             projectTarget();
             ctx.beginPath();
             ctx.fillStyle = '#FFD700'; // Yellow color
-            ctx.arc(target.projX, target.projY, settings.targetRadius * target.projScale, 0, Math.PI * 2);
+            const targetSize = settings.targetRadius * 2 * target.projScale; // Convert radius to square size
+            ctx.rect(
+                target.projX - targetSize/2, // Center the square
+                target.projY - targetSize/2,
+                targetSize,
+                targetSize
+            );
             ctx.fill();
 
             requestAnimationFrame(animate);
@@ -1017,40 +1008,16 @@
             const radius = Math.min(width, height) * 0.3;
             let x, y, z;
 
-            switch (settings.currentShape) {
-                case 'sphere':
-                    // Random point on sphere surface
-                    const phi = Math.random() * Math.PI * 2;
-                    const theta = Math.acos(2 * Math.random() - 1);
-                    x = radius * Math.sin(theta) * Math.cos(phi);
-                    y = radius * Math.sin(theta) * Math.sin(phi);
-                    z = radius * Math.cos(theta);
-                    break;
-
-                case 'torus':
-                    // Random point on torus surface
-                    const R = radius; // Major radius
-                    const r = radius * 0.4; // Minor radius
-                    const u = Math.random() * Math.PI * 2;
-                    const v = Math.random() * Math.PI * 2;
-                    x = (R + r * Math.cos(v)) * Math.cos(u);
-                    y = (R + r * Math.cos(v)) * Math.sin(u);
-                    z = r * Math.sin(v);
-                    break;
-
-                case 'cube':
-                    // Random point on cube surface
-                    const side = radius * 1.5;
-                    const face = Math.floor(Math.random() * 6);
-                    switch(face) {
-                        case 0: x = -side/2; y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // left
-                        case 1: x = side/2;  y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // right
-                        case 2: y = -side/2; x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // top
-                        case 3: y = side/2;  x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // bottom
-                        case 4: z = -side/2; x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // back
-                        case 5: z = side/2;  x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // front
-                    }
-                    break;
+            // Only cube shape now
+            const side = radius * 1.5;
+            const face = Math.floor(Math.random() * 6);
+            switch(face) {
+                case 0: x = -side/2; y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // left
+                case 1: x = side/2;  y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // right
+                case 2: y = -side/2; x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // top
+                case 3: y = side/2;  x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // bottom
+                case 4: z = -side/2; x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // back
+                case 5: z = side/2;  x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // front
             }
 
             return { x, y, z };
@@ -1076,7 +1043,9 @@
             const dx = target.projX - clickX;
             const dy = target.projY - clickY;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            return dist <= settings.targetRadius;
+            // Use half of the square's diagonal as the hit radius
+            const hitRadius = settings.targetRadius * Math.sqrt(2) * target.projScale;
+            return dist <= hitRadius;
         }
 
         // --- Start ---
