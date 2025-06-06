@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Particle Cloud Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #particleCanvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px 20px;
+            border-radius: 10px;
+            z-index: 2;
+            border: 1px solid #333;
+            max-width: 300px;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+            text-align: center;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        input[type="range"],
+        input[type="color"],
+        input[type="text"] {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 5px;
+            background: #444;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+            border-radius: 5px;
+        }
+        
+        input[type="range"]:hover {
+            opacity: 1;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #00bcd4;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            background: #00bcd4;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .shape-buttons button {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            margin: 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.2s, border-color 0.2s;
+            flex-grow: 1;
+        }
+
+        .shape-buttons button:hover, .shape-buttons button.active {
+            background-color: #00bcd4;
+            border-color: #00bcd4;
+        }
+
+        .shape-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        
+        .text-input-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .text-input-group input {
+            flex-grow: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="particleCanvas"></canvas>
+
+    <div id="controls">
+        <h2>Particle Controls</h2>
+
+        <div class="control-group shape-buttons">
+            <button id="btn-sphere" class="active">Sphere</button>
+            <button id="btn-torus">Torus</button>
+            <button id="btn-cube">Cube</button>
+        </div>
+
+        <div class="control-group">
+            <label for="text-input">Custom Text:</label>
+            <div class="text-input-group">
+                 <input type="text" id="text-input" placeholder="Type here...">
+                 <button id="btn-text">Set</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label for="particle-count">Particle Count: <span id="count-label">3000</span></label>
+            <input type="range" id="particle-count" min="500" max="10000" step="100" value="3000">
+        </div>
+
+        <div class="control-group">
+            <label for="particle-color">Particle Color</label>
+            <input type="color" id="particle-color" value="#00bcd4">
+        </div>
+
+        <div class="control-group">
+            <label for="particle-size">Particle Size: <span id="size-label">1.5</span></label>
+            <input type="range" id="particle-size" min="0.5" max="5" step="0.1" value="1.5">
+        </div>
+
+        <div class="control-group">
+            <label for="speed">Transition Speed: <span id="speed-label">0.05</span></label>
+            <input type="range" id="speed" min="0.01" max="0.2" step="0.01" value="0.05">
+        </div>
+        
+        <div class="control-group">
+            <label for="repel-force">Mouse Repel Force: <span id="repel-label">50</span></label>
+            <input type="range" id="repel-force" min="0" max="200" step="1" value="50">
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height, centerX, centerY;
+        let particles = [];
+        let mouse = { x: null, y: null, radius: 150 };
+
+        const settings = {
+            particleCount: 3000,
+            particleColor: '#00bcd4',
+            particleSize: 1.5,
+            speed: 0.05,
+            repelForce: 50,
+            fov: 300 // Field of view for 3D projection
+        };
+
+        // --- UI Controls ---
+        const countSlider = document.getElementById('particle-count');
+        const colorPicker = document.getElementById('particle-color');
+        const sizeSlider = document.getElementById('particle-size');
+        const speedSlider = document.getElementById('speed');
+        const repelSlider = document.getElementById('repel-force');
+        const countLabel = document.getElementById('count-label');
+        const sizeLabel = document.getElementById('size-label');
+        const speedLabel = document.getElementById('speed-label');
+        const repelLabel = document.getElementById('repel-label');
+        
+        const shapeButtons = document.querySelectorAll('.shape-buttons button');
+        const textInput = document.getElementById('text-input');
+        const textButton = document.getElementById('btn-text');
+        
+        // Update labels and settings from UI
+        countSlider.addEventListener('input', () => countLabel.textContent = countSlider.value);
+        countSlider.addEventListener('change', () => {
+            settings.particleCount = parseInt(countSlider.value);
+            init();
+        });
+
+        colorPicker.addEventListener('input', () => settings.particleColor = colorPicker.value);
+        sizeSlider.addEventListener('input', () => {
+            settings.particleSize = parseFloat(sizeSlider.value);
+            sizeLabel.textContent = settings.particleSize.toFixed(1);
+        });
+        speedSlider.addEventListener('input', () => {
+            settings.speed = parseFloat(speedSlider.value);
+            speedLabel.textContent = settings.speed.toFixed(2);
+        });
+        repelSlider.addEventListener('input', () => {
+            settings.repelForce = parseFloat(repelSlider.value);
+            repelLabel.textContent = settings.repelForce.toFixed(0);
+        });
+
+        shapeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                shapeButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                const shape = button.id.split('-')[1];
+                setShape(shape);
+            });
+        });
+        
+        const setTextShape = () => {
+            const text = textInput.value.trim();
+            if (text) {
+                shapeButtons.forEach(btn => btn.classList.remove('active'));
+                setShape('text', text);
+            }
+        };
+
+        textButton.addEventListener('click', setTextShape);
+        textInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                setTextShape();
+            }
+        });
+
+
+        // --- Particle Class ---
+        class Particle {
+            constructor() {
+                // Current position (starts randomly)
+                this.x = (Math.random() - 0.5) * width;
+                this.y = (Math.random() - 0.5) * height;
+                this.z = (Math.random() - 0.5) * width;
+
+                // Target position
+                this.tx = this.x;
+                this.ty = this.y;
+                this.tz = this.z;
+                
+                // Projected 2D position
+                this.projX = 0;
+                this.projY = 0;
+                this.projScale = 1;
+            }
+
+            // Project 3D coordinates to 2D
+            project() {
+                this.projScale = settings.fov / (settings.fov + this.z);
+                this.projX = this.x * this.projScale + centerX;
+                this.projY = this.y * this.projScale + centerY;
+            }
+
+            // Update position (move towards target)
+            update() {
+                // Easing towards target
+                this.x += (this.tx - this.x) * settings.speed;
+                this.y += (this.ty - this.y) * settings.speed;
+                this.z += (this.tz - this.z) * settings.speed;
+
+                // Mouse repulsion
+                if (mouse.x !== null && settings.repelForce > 0) {
+                    const dx = this.projX - mouse.x;
+                    const dy = this.projY - mouse.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < mouse.radius) {
+                        const force = (mouse.radius - dist) / mouse.radius;
+                        const angle = Math.atan2(dy, dx);
+                        const repelX = Math.cos(angle) * force * settings.repelForce;
+                        const repelY = Math.sin(angle) * force * settings.repelForce;
+                        
+                        // Apply repulsion to 3D coords based on projection
+                        this.x += repelX;
+                        this.y += repelY;
+                    }
+                }
+            }
+
+            draw() {
+                this.project();
+                const size = settings.particleSize * this.projScale;
+                // Fade out particles that are far away or behind
+                const alpha = Math.max(0, Math.min(1, this.projScale * 1.5));
+
+                if (size > 0 && alpha > 0) {
+                    ctx.beginPath();
+                    ctx.globalAlpha = alpha;
+                    ctx.arc(this.projX, this.projY, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        
+        // --- Shape Generators ---
+        function setShape(shape, text = '') {
+            let points = [];
+            const radius = Math.min(width, height) * 0.3;
+
+            switch (shape) {
+                case 'sphere':
+                    for (let i = 0; i < settings.particleCount; i++) {
+                        const phi = Math.acos(-1 + (2 * i) / settings.particleCount);
+                        const theta = Math.sqrt(settings.particleCount * Math.PI) * phi;
+                        const x = radius * Math.cos(theta) * Math.sin(phi);
+                        const y = radius * Math.sin(theta) * Math.sin(phi);
+                        const z = radius * Math.cos(phi);
+                        points.push({ x, y, z });
+                    }
+                    break;
+
+                case 'torus':
+                    const R = radius; // Major radius
+                    const r = radius * 0.4; // Minor radius
+                    for (let i = 0; i < settings.particleCount; i++) {
+                        const u = (i / settings.particleCount) * 2 * Math.PI;
+                        const v = Math.random() * 2 * Math.PI;
+                        const x = (R + r * Math.cos(v)) * Math.cos(u);
+                        const y = (R + r * Math.cos(v)) * Math.sin(u);
+                        const z = r * Math.sin(v);
+                        points.push({ x, y, z });
+                    }
+                    break;
+                
+                case 'cube':
+                    const side = radius * 1.5;
+                    for (let i = 0; i < settings.particleCount; i++) {
+                        let x, y, z;
+                        const face = Math.floor(Math.random() * 6);
+                        switch(face) {
+                            case 0: x = -side/2; y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // left
+                            case 1: x = side/2;  y = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // right
+                            case 2: y = -side/2; x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // top
+                            case 3: y = side/2;  x = Math.random() * side - side/2; z = Math.random() * side - side/2; break; // bottom
+                            case 4: z = -side/2; x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // back
+                            case 5: z = side/2;  x = Math.random() * side - side/2; y = Math.random() * side - side/2; break; // front
+                        }
+                        points.push({ x, y, z });
+                    }
+                    break;
+
+                case 'text':
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCanvas.width = 500;
+                    tempCanvas.height = 150;
+                    tempCtx.fillStyle = 'white';
+                    tempCtx.font = 'bold 100px Arial';
+                    tempCtx.textAlign = 'center';
+                    tempCtx.textBaseline = 'middle';
+                    tempCtx.fillText(text, tempCanvas.width / 2, tempCanvas.height / 2);
+
+                    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                    const pixelData = imageData.data;
+                    const sampleRate = 4; // Use every 4th pixel to reduce density
+
+                    for (let y = 0; y < tempCanvas.height; y += sampleRate) {
+                        for (let x = 0; x < tempCanvas.width; x += sampleRate) {
+                            const index = (y * tempCanvas.width + x) * 4;
+                            if (pixelData[index + 3] > 128) { // Check alpha channel
+                                points.push({
+                                    x: (x - tempCanvas.width / 2) * 2.5,
+                                    y: (y - tempCanvas.height / 2) * 2.5,
+                                    z: (Math.random() - 0.5) * 50
+                                });
+                            }
+                        }
+                    }
+                    break;
+            }
+            
+            // Assign target positions to particles
+            for (let i = 0; i < settings.particleCount; i++) {
+                if (particles[i]) {
+                    const target = points[i % points.length];
+                    if (target) {
+                        particles[i].tx = target.x;
+                        particles[i].ty = target.y;
+                        particles[i].tz = target.z;
+                    } else { // Hide extra particles if shape has fewer points
+                        particles[i].tx = particles[i].x;
+                        particles[i].ty = particles[i].y;
+                        particles[i].tz = 10000; // Move it far away
+                    }
+                }
+            }
+        }
+        
+        // --- Main Functions ---
+        function init() {
+            resizeCanvas();
+            particles = [];
+            for (let i = 0; i < settings.particleCount; i++) {
+                particles.push(new Particle());
+            }
+            // Set initial shape
+            const activeShapeButton = document.querySelector('.shape-buttons button.active');
+            setShape(activeShapeButton.id.split('-')[1]);
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = settings.particleColor;
+            
+            for (const particle of particles) {
+                particle.update();
+                particle.draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            centerX = width / 2;
+            centerY = height / 2;
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            // Re-calculate shape based on new dimensions
+            const activeShapeButton = document.querySelector('.shape-buttons button.active');
+            if (activeShapeButton) {
+                setShape(activeShapeButton.id.split('-')[1]);
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        window.addEventListener('mouseout', () => {
+            mouse.x = null;
+            mouse.y = null;
+        });
+        
+        // --- Start ---
+        init();
+        animate();
+    });
+    </script>
+</body>
+</html>
